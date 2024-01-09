@@ -10,13 +10,15 @@ import SwiftUI
 
 struct ContentView: View {
     
-    @State private var wakeUp = Date.now
+    @State private var wakeUp = defaultWakeTime
     @State private var sleepAmount = 8.0
     @State private var coffeeAmount = 1
     
     @State private var alertTitle = ""
     @State private var alertMessage = ""
     @State private var showingAlert = false
+    
+    @State private var sleepTime: Date = defaultSleepTime
     
     static var defaultWakeTime: Date {
         var components = DateComponents()
@@ -25,29 +27,43 @@ struct ContentView: View {
         return Calendar.current.date(from: components) ?? .now
     }
     
+    static var defaultSleepTime: Date {
+        var components = DateComponents()
+        components.hour = 21
+        components.minute = 0
+        return Calendar.current.date(from: components) ?? .now
+    }
+    
     var body: some View {
         NavigationStack {
             Form {
-                VStack(alignment: .leading, spacing: 0) {
-                    Text("When do you want to wake up?")
-                        .font(.headline)
-                    
+                Section("When do you want to wake up?") {
                     DatePicker("Please enter a time", selection: $wakeUp, displayedComponents: .hourAndMinute)
                         .labelsHidden()
+                        .frame(maxWidth: .infinity, alignment: .center)
                 }
-                VStack(alignment: .leading, spacing: 0) {
-                    Text("Desired amount of sleep")
-                        .font(.headline)
-                    
+                Section("Desired amount of sleep") {
                     Stepper("\(sleepAmount.formatted()) hours", value: $sleepAmount, in: 4...12, step: 0.25)
                 }
-                VStack(alignment: .leading, spacing: 0) {
-                    Text("Daily coffee intake")
-                        .font(.headline)
-                    
+                Section("Daily coffee intake") {
                     Stepper("^[\(coffeeAmount) cup](inflect: true)", value: $coffeeAmount, in: 1...20)
                 }
+                Section("Desired amount of sleep") {
+                    Picker("\(sleepAmount.formatted()) hours", selection: $sleepAmount) {
+                        ForEach(Array(stride(from: 4.0, through: 12.0, by: 0.25)), id: \.self) { value in
+                            Text("\(value, specifier: "%.2f") hours").tag(value)
+                        }
+                    }
+                }
+                Section("Daily coffee intake") {
+                    Picker("^[\(coffeeAmount) cup](inflect: true)", selection: $coffeeAmount) {
+                        ForEach(1...20, id: \.self) {
+                            Text("\($0)")
+                        }
+                    }
+                }
             }
+            Text("Your ideal bedtime is \(sleepTime.formatted(date: .omitted, time: .shortened))")
             .navigationTitle("BetterRest")
             .toolbar {
                 Button("Calculate", action: calculatedBedtime)
@@ -71,10 +87,11 @@ struct ContentView: View {
             
             let prediction = try model.prediction(wake: Int64(Double(hour + minute)), estimatedSleep: sleepAmount, coffee: Int64(Double(coffeeAmount)))
             
-            let sleepTime = wakeUp - prediction.actualSleep
+            let sleepTimeCalculated = wakeUp - prediction.actualSleep
+            self.sleepTime = sleepTimeCalculated
             
             alertTitle = "Your ideal bedtime is..."
-            alertMessage = sleepTime.formatted(date: .omitted, time: .shortened)
+            alertMessage = sleepTimeCalculated.formatted(date: .omitted, time: .shortened)
         } catch {
             alertTitle = "Error"
             alertMessage = "Sorry, thre was a problem calculating your bedtime"
